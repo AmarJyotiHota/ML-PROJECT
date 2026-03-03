@@ -13,13 +13,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (accuracy_score, precision_score, recall_score,
                              f1_score, confusion_matrix, roc_curve, auc)
 
-# Set style for plots
 sns.set_style("whitegrid")
 plt.rcParams["figure.figsize"] = (12, 8)
 
-# ------------------------------
-# 1. Load the dataset
-# ------------------------------
 df = pd.read_csv("cyberfeddefender_dataset.csv")
 print("=" * 60)
 print("DATA OVERVIEW")
@@ -41,24 +37,14 @@ cols_to_drop = ['Timestamp', 'Source_IP', 'Destination_IP']
 df.drop(columns=cols_to_drop, inplace=True, errors='ignore')
 print(f"\nColumns after dropping identifiers: {df.columns.tolist()}")
 
-# ------------------------------
-# 3. Encode categorical features
-# ------------------------------
-# Encode 'Protocol'
 le_protocol = LabelEncoder()
 df['Protocol'] = le_protocol.fit_transform(df['Protocol'])
 
-# Keep 'Attack_Type' for reference, but we won't use it for binary prediction
-# If you want multi-class later, you could encode it
 
-# ------------------------------
-# 4. Exploratory Data Analysis (EDA)
-# ------------------------------
 print("\n" + "=" * 60)
 print("EXPLORATORY DATA ANALYSIS")
 print("=" * 60)
 
-# 4.1 Target distribution (Label)
 plt.figure(figsize=(6,4))
 sns.countplot(x='Label', data=df, palette='viridis')
 plt.title('Distribution of Target Label (0 = Normal, 1 = Attack)')
@@ -66,18 +52,15 @@ plt.xlabel('Label')
 plt.ylabel('Count')
 plt.show()
 
-# 4.2 Protocol distribution
 plt.figure(figsize=(6,4))
 sns.countplot(x='Protocol', data=df, palette='Set2')
 plt.title('Distribution of Protocol Types')
 plt.xlabel('Protocol (encoded)')
 plt.ylabel('Count')
-# Add original labels if needed
 protocol_names = le_protocol.classes_
 plt.xticks(ticks=range(len(protocol_names)), labels=protocol_names, rotation=45)
 plt.show()
 
-# 4.3 Numerical feature distributions (select a few key features)
 num_cols = ['Packet_Length', 'Duration', 'Bytes_Sent', 'Bytes_Received',
             'Flow_Packets/s', 'Flow_Bytes/s', 'Avg_Packet_Size']
 fig, axes = plt.subplots(2, 4, figsize=(16, 8))
@@ -90,7 +73,6 @@ for i, col in enumerate(num_cols):
 plt.tight_layout()
 plt.show()
 
-# 4.4 Boxplots of key features grouped by Label
 fig, axes = plt.subplots(2, 4, figsize=(16, 8))
 axes = axes.ravel()
 for i, col in enumerate(num_cols):
@@ -99,45 +81,34 @@ for i, col in enumerate(num_cols):
 plt.tight_layout()
 plt.show()
 
-# 4.5 Correlation heatmap (numerical features only)
-# Select numerical columns
 num_df = df.select_dtypes(include=[np.number])
 plt.figure(figsize=(20, 16))
 sns.heatmap(num_df.corr(), annot=True, fmt='.2f', cmap='coolwarm', linewidths=0.5)
 plt.title('Correlation Heatmap of Numerical Features')
 plt.show()
 
-# ------------------------------
-# 5. Prepare data for modeling
-# ------------------------------
-# Separate features and target
+
 X = df.drop('Label', axis=1)
 y = df['Label']
 
-# Drop any remaining non‑numeric columns (just in case)
 X = X.select_dtypes(include=[np.number])
 print(f"\nFeatures after dropping non-numeric: {X.columns.tolist()}")
 
-# Train / test split
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.01, random_state=42, stratify=y
 )
 print(f"\nTraining set size: {X_train.shape}")
 print(f"Test set size: {X_test.shape}")
 
-# Scale features
 scaler_std = StandardScaler()
 X_train_std = scaler_std.fit_transform(X_train)
 X_test_std = scaler_std.transform(X_test)
 
-# For MultinomialNB we need non‑negative features
 scaler_mm = MinMaxScaler()
 X_train_mm = scaler_mm.fit_transform(X_train)
 X_test_mm = scaler_mm.transform(X_test)
 
-# ------------------------------
-# 6. Define models
-# ------------------------------
+
 models = {
     'Gaussian NB': GaussianNB(),
     'Multinomial NB': MultinomialNB(),
@@ -146,32 +117,24 @@ models = {
     'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42)
 }
 
-# Store results
 results = {}
 plt.figure(figsize=(15, 12))
 roc_curves = {}
 
-# ------------------------------
-# 7. Train, evaluate, and plot results for each model
-# ------------------------------
 for idx, (name, model) in enumerate(models.items()):
     print("\n" + "-" * 50)
     print(f"Training {name}...")
 
-    # Choose appropriate scaled data
     if name == 'Multinomial NB':
         X_tr, X_te = X_train_mm, X_test_mm
     else:
         X_tr, X_te = X_train_std, X_test_std
 
-    # Train
     model.fit(X_tr, y_train)
 
-    # Predict
     y_pred = model.predict(X_te)
     y_proba = model.predict_proba(X_te)[:, 1] if hasattr(model, "predict_proba") else None
 
-    # Metrics
     acc = accuracy_score(y_test, y_pred)
     prec = precision_score(y_test, y_pred)
     rec = recall_score(y_test, y_pred)
@@ -184,7 +147,6 @@ for idx, (name, model) in enumerate(models.items()):
     print(f"Recall:    {rec:.4f}")
     print(f"F1-score:  {f1:.4f}")
 
-    # Confusion matrix
     cm = confusion_matrix(y_test, y_pred)
     plt.subplot(2, 3, idx+1)
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False)
@@ -192,7 +154,6 @@ for idx, (name, model) in enumerate(models.items()):
     plt.xlabel('Predicted')
     plt.ylabel('Actual')
 
-    # ROC curve (if probabilities are available)
     if y_proba is not None:
         fpr, tpr, _ = roc_curve(y_test, y_proba)
         roc_auc = auc(fpr, tpr)
@@ -200,10 +161,6 @@ for idx, (name, model) in enumerate(models.items()):
 
 plt.tight_layout()
 plt.show()
-
-# ------------------------------
-# 8. ROC curves comparison
-# ------------------------------
 plt.figure(figsize=(8, 6))
 for name, (fpr, tpr, roc_auc) in roc_curves.items():
     plt.plot(fpr, tpr, label=f'{name} (AUC = {roc_auc:.3f})')
@@ -216,9 +173,6 @@ plt.title('ROC Curves Comparison')
 plt.legend(loc="lower right")
 plt.show()
 
-# ------------------------------
-# 9. Model comparison bar chart
-# ------------------------------
 results_df = pd.DataFrame(results).T
 print("\n" + "=" * 60)
 print("MODEL COMPARISON TABLE")
@@ -234,9 +188,6 @@ plt.legend(loc='lower right')
 plt.tight_layout()
 plt.show()
 
-# ------------------------------
-# 10. Example prediction for a single sample
-# ------------------------------
 print("\n" + "=" * 60)
 print("EXAMPLE PREDICTION (using Gaussian NB)")
 print("=" * 60)
