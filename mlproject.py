@@ -30,9 +30,7 @@ print(df.isnull().sum())
 print("\nBasic statistics:")
 print(df.describe(include='all'))
 
-# ------------------------------
-# 2. Drop non‑predictive columns
-# ------------------------------
+
 cols_to_drop = ['Timestamp', 'Source_IP', 'Destination_IP']
 df.drop(columns=cols_to_drop, inplace=True, errors='ignore')
 print(f"\nColumns after dropping identifiers: {df.columns.tolist()}")
